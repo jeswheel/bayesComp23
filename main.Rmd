@@ -74,6 +74,19 @@ knitr::opts_chunk$set(
 
 # Introduction
 
+## Partially Observed Markov Processes 
+
+- The models we focus on are partially observed Markov processes (POMP)
+
+![Credit: @king22](images/pomp.png){width=70%}
+
+## POMP Models 
+
+- Parameter vector $\theta$ that indexes the model
+- One step transition density: $f_{X_n|X_{n - 1}}(x_n|x_{n -1};\theta)$ that we can simulate from (may not be able to evaluate or express in closed form).
+- Measurement Model: $f_{Y_{n}|X_n}(y_n|x_n; \theta)$.
+- Initial density: $f_{X_0}(x_0;\theta)$
+
 ## Advantages of Statistical Modeling
 
 - Nonlinear-dynamic statistical models have proven to be a useful tool for modeling infectious disease outbreaks (TODO: CITE)
@@ -174,11 +187,22 @@ gc()
 
 - We build on the study by Lee et. al (2020), in which four independent teams built non-linear models to describe cholera dynamics.
 
-| | Model 1 | Model 2 | Model 3 | Model 4 | 
-| ------- | ------- | ------- | ------- | ------- | 
-| Deterministic / Stochastic | Stochastic | Deterministic | Stochastic | Agent Based | 
-| Spatial Model | No | Yes | Yes | Yes | 
-| Fitting Method | IF2 | Trajectory Matching | PIF / IF2 | NA | 
+| | Model 1 | Model 2 | Model 3 |
+| ------- | ------- | ------- | ------- | 
+| Deterministic / Stochastic | Stochastic | Deterministic | Stochastic | 
+| Spatial Model | No | Yes | Yes | 
+| Fitting Method | IF2 | Trajectory Matching | IBPF | 
+
+## Goals
+
+Our goals in this study is to provide practical advice on how to use non-linear dynamic models to make inference on a dynamic system. 
+We specifically focus on the following topics: 
+
+- Model Fitting 
+- Diagnostics 
+- Forecasting
+- Interpreting Results 
+- Reproducibility
 
 # Model Fitting 
 
@@ -188,13 +212,19 @@ gc()
 - Because of the non-linear nature of the models, this can be computationally expensive. 
 - Great care should be taken to determine the necessary amount of computation needed to solve the problem at hand. 
 
+## Example: Model 3 
+
+- We calibrate this model using the new IBPF algorithm (TODO: Cite), which enables parameter estimation via maximum likelihood for high-dimensional nonlinear POMP models.
+- The original version of this model was fit using an alternative approach designed to maximize the model likelihood. 
+- Without modifications to the model, we obtained parameter estimates corresponding to hundreds of log-likelihood unit improvements to the original model fit. 
+
 ## Nested Models 
 
 - Non-linear dynamic models make assumptions about the dynamics of the system in question. 
 - Consider testing scientifically meaningful nested hypothesis. 
 - For example, we consider adding a linear trend in transmission to Model 1 in order to account for the apparent decrease in cholera cases. 
 
-## Model 1 
+## Example: Model 1 
 
 ![Model 1](images/model1.pdf)
 
@@ -211,12 +241,47 @@ $$
 
 - $\frac{d\Gamma}{dt}$ is multiplicative Gamma white-process noise, $\epsilon, \nu, \xi, \beta_{1:6}$ are parameters to be estimated, $s_{1:6}(t)$ are a B-spline basis. 
 
+## Testing a linear trend 
+
+- We test for a linear trend in transmission using a 95% Monte Carlo adjust profile confidence interval (MCAP-CI) (TODO: Cite).
+- The test suggests a marginally significant negative linear trend in transmission, with confidence interval $\xi \in (-0.085, -0.005)$.
+
+![MCAP-CI for linear trend in transmission](images/trend.pdf){width=68%}
+
 # Model Diagnostics 
 
 ## Don't just rely on simulations 
 
-## For me 
+text
+
+## Interpreting Results
+
+text
 
 # Model Forecasts 
 
+## Model Forecasts
+
+- One of the primary reasons dynamic models are fit to data is to obtain forecasts of the future state of the system. 
+- When done carefully, forecasts can be helpful in informing policy and may enable real-time testing of new scientific hypothesis @lewis22.
+
+## Using Real-time data on the system 
+
+- Recent information about a dynamic system should be more relevant for a forecast than older information. 
+- While the previous statement seems self-evident, it is not the case for deterministic models which depend only on initial conditions, and is often not done in practice. 
+- Let $X_{0:N}$ and $Y_{1:N}$ be random vectors denoting the latent and observed states from times $t_0, t_1, \ldots, t_N$, and let $y_{1:N}^*$ be the observed data that we use to fit a model. 
+- Forecasts for future times $t_{N+1}, \ldots, t_{N+s}$ should be based on draws from $f_{Y_{N+1:N+S}|Y_{1:N} = y_{1:N}^*}(Y_{N+1:N+S}|Y_{1:N} = y_{1:N}^*; \hat{\theta})$, which can be done simulating starting from hidden states drawn from the filtering distribution at time $t_N$.
+
+## Accounting for All Uncertainty 
+
+- Deterministic models are useful for obtaining estimates of general trends of the system but can lead to over-confidence in model forecasts (TODO: Cite kings paper). 
+- Stochastic models account can include randomness in both the process and measurement models (TODO: Cite ionides paper on this)
+- It is important to also account for uncertainty in parameter estimates, as uncertainty in just a single parameter can lead to drastically different forecasts @saltelli20. 
+
 # Reproducibility
+
+## Reproducibility 
+
+Text
+
+## Bibliography
