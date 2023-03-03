@@ -1,0 +1,268 @@
+---
+title: 'Informing Policy via Dynamic Models: Cholera in Haiti'
+author: 
+  - Jesse Wheeler
+  - AnnaElaine Rosengart
+  - Zhuoxun Jiang
+  - Kevin Hao En Tan
+  - Noah Treutle
+  - Edward Ionides
+date: "`r Sys.Date()`"
+always_allow_html: true
+output:
+  beamer_presentation:
+    theme: "AnnArbor"
+    colortheme: "seahorse"
+    fonttheme: "structurebold"
+bibliography: bib-haiti.bib
+csl: statistical-science.csl
+header-includes:
+  - \AtBeginEnvironment{CSLReferences}{\small}
+  - \usepackage{makecell}
+  - \usepackage{multicol}
+  - \usepackage{multirow}
+  - \usepackage{xcolor}
+---
+
+```{r setup, include=FALSE}
+library(tidyverse)
+library(haitipkg)
+library(DiagrammeR)
+
+myround <- function (x, digits = 1) {
+  # taken from the broman package
+  if (digits < 1)
+    stop("This is intended for the case digits >= 1.")
+  if (length(digits) > 1) {
+    digits <- digits[1]
+    warning("Using only digits[1]")
+  }
+  tmp <- sprintf(paste("%.", digits, "f", sep = ""), x)
+  zero <- paste0("0.", paste(rep("0", digits), collapse = ""))
+  tmp[tmp == paste0("-", zero)] <- zero
+  tmp
+}
+
+dep_labeller <- as_labeller(
+  c(
+    'Artibonite' = 'Artibonite',
+    'Sud_Est' = 'Sud-Est',
+    'Sud.Est' = 'Sud-Est',
+    'Nippes' = 'Nippes',
+    'Nord_Est' = 'Nord-Est',
+    'Nord.Est' = 'Nord-Est',
+    'Ouest' = 'Ouest',
+    'Centre' = 'Centre',
+    'Nord' = 'Nord',
+    'Sud' = 'Sud',
+    'Nord_Ouest' = 'Nord-Ouest',
+    'Nord.Ouest' = 'Nord-Ouest',
+    'Grande_Anse' = 'Grand\'Anse',
+    'Grand.Anse' = 'Grand\'Anse'
+  )
+)
+
+theme_set(theme_bw())
+
+knitr::opts_chunk$set(
+  echo = FALSE,
+  fig.height = 3, 
+  fig.width = 4.75,
+  message = FALSE
+)
+```
+
+# Introduction
+
+## Advantages of Statistical Modeling
+
+- Nonlinear-dynamic statistical models have proven to be a useful tool for modeling infectious disease outbreaks (TODO: CITE)
+- Most common examples are SIR models and their various extensions. 
+- These models enable the modeling of scientifically meaningful states, prediction of the future of the outbreak, and modeling the potential effects of interventions (such as vaccinations) (TODO: CITE)
+
+## Concerns 
+
+- Despite their utility, there exist many cautionary warnings against the use of these types of models (TODO: CITE). 
+- Concerns include: 
+    - TODO 
+    - TODO
+    - TODO
+- Despite these warnings, there is very little practical advice on how to approach these issues.
+
+## Cholera in Haiti 
+
+- We consider the 2010-2019 cholera outbreak in Haiti.
+- Cholera was introduced to Haiti in 2010 following the devastating earthquake of the same year. 
+- Although some new cases have been detected, there were no recorded cholera cases in Haiti between February, 2019 and September 2022 (TODO: Cite).
+
+## Data
+
+```{r prepData, include=FALSE, echo=FALSE, message=FALSE}
+plot_df <- haitiCholera %>%
+  select(-report) %>%
+  mutate(date = as.Date(date_saturday)) %>%
+  select(-date_saturday) %>%
+  pivot_longer(
+    data = .,
+    cols = -c(date),
+    names_to = 'Departement',
+    values_to = "Cases",
+  )
+```
+
+```{r plotNationalData, cache=TRUE}
+true_agg_cases <- haitiCholera %>%
+  select(-report) %>%
+  pivot_longer(
+    data = .,
+    cols = -date_saturday,
+    values_to = 'cases',
+    names_to = 'dep'
+  ) %>%
+  mutate(
+    date = as.Date(date_saturday),
+    dep = gsub("\\.", "_", dep)
+  ) %>%
+  mutate(
+    dep = case_when(dep == "Grand_Anse" ~ "Grande_Anse", TRUE ~ dep)
+  ) %>%
+  tidyr::pivot_wider(
+    data = .,
+    id_cols = c(date),
+    names_from = dep,
+    values_from = cases,
+    names_prefix = 'cases_'
+  ) %>%
+  mutate(
+    ReportedAll = cases_Artibonite + cases_Centre +
+      cases_Grande_Anse + cases_Nippes + cases_Nord +
+      cases_Nord_Est + cases_Ouest + cases_Sud +
+      cases_Sud_Est + cases_Nord_Ouest
+  )
+
+ggplot(true_agg_cases, aes(x = date, y = ReportedAll)) + 
+  geom_line() + 
+  theme(axis.title.x = element_blank()) + 
+  ylab("Reported Cases") +
+  scale_y_log10(
+    labels = scales::trans_format("log10", scales::math_format(10^.x))
+  ) + 
+  scale_x_date(date_labels = "%Y", breaks = seq.Date(from = as.Date("2011-01-01"), as.Date("2019-01-01"), by = '1 years'))
+```
+
+## Data
+
+```{r PlotData, cache=TRUE}
+ggplot(plot_df, aes(x = date, y = Cases + 1)) +
+  facet_wrap(~Departement, nrow = 2, labeller = dep_labeller) +
+  geom_line() +
+  theme(
+    axis.title.x = element_blank(),
+    axis.text.x = element_text(size = 8)
+  ) +
+  ylab('Reported Cases') +
+  scale_y_log10(labels = scales::trans_format("log10", scales::math_format(10^.x))) +
+  scale_x_date(date_labels = "'%y", breaks = seq.Date(from = as.Date("2011-01-01"), as.Date("2019-01-01"), by = '2 years'))
+```
+
+```{r cleanPlotDf, include=FALSE, message=FALSE, echo=FALSE}
+rm(plot_df)
+gc()
+```
+
+## Models 
+
+- We build on the study by Lee et. al (2020), in which four independent teams built non-linear models to describe cholera dynamics.
+
+| | Model 1 | Model 2 | Model 3 | Model 4 | 
+| ------- | ------- | ------- | ------- | ------- | 
+| Deterministic / Stochastic | Stochastic | Deterministic | Stochastic | Agent Based | 
+| Spatial Model | No | Yes | Yes | Yes | 
+| Fitting Method | IF2 | Trajectory Matching | PIF / IF2 | NA | 
+
+# Model Fitting 
+
+## Computing 
+
+- Parameters of nonlinear dynamic models are often fit by finding their posterior distribution or by maximizing some objective measure.
+- Because of the non-linear nature of the models, this can be computationally expensive. 
+- Great care should be taken to determine the necessary amount of computation needed to solve the problem at hand. 
+
+## Nested Models 
+
+- Non-linear dynamic models make assumptions about the dynamics of the system in question. 
+- Consider testing scientifically meaningful nested hypothesis. 
+- For example, we consider adding a linear trend in transmission to Model 1 in order to account for the apparent decrease in cholera cases. 
+
+## Model 1 
+
+```{r, fig.cap="Model 1", fig.width=2, fig.height=2}
+grViz("
+
+digraph model1 {
+  rankdir = LR
+
+  node [shape = circle]
+  subgraph{
+    rank = same; S; Sv [label = <S<SUB>v</SUB>>]
+  }
+  
+  subgraph{
+    rank = same; E; Ev [label = <E<SUB>v</SUB>>]
+  }
+  
+  subgraph{
+    rank = same; I; A; Iv [label = <I<SUB>v</SUB>>]; Av [label = <A<SUB>v</SUB>>]
+  }
+  
+  subgraph{
+    rank = same; R; Rv [label = <R<SUB>v</SUB>>]
+  }
+  
+  E; I; A; R;
+  
+  S->E [xlabel = '\U03BB']
+  E->A
+  E->I 
+  I->R
+  A->R
+  R->S [headport='n', tailport='n']
+  Sv->Ev
+  Ev->{Iv Av}
+  {Iv Av}->Rv
+  Rv->Sv [headport='s', tailport='s']
+  
+  edge [style='dashed', minlen = 2]
+  S->Sv [minlen = 3]
+  E->Ev
+  I->Iv
+  R->Rv 
+  A->Av
+  
+}
+      
+", width = 205)
+```
+
+## Model 1 (Continued...)
+
+- Individuals move $S \rightarrow E$ at time $t$ with a rate of $\lambda(t)$, where: 
+
+$$
+\lambda(t) = (I + \epsilon A)^\nu \color{red}{\frac{d\Gamma(t)}{dt}} \color{black}{\beta(t)/N},
+$$
+$$
+\log \beta(t) = \sum_{j = 1}^6\beta_js_j(t) + \color{red}{\xi \bar{t}}
+$$
+
+- $\frac{d\Gamma}{dt}$ is multiplicative Gamma white-process noise, $\epsilon, \nu, \xi, \beta_{1:6}$ are parameters to be estimated, $s_{1:6}(t)$ are a B-spline basis. 
+
+# Model Diagnostics 
+
+## Don't just rely on simulations 
+
+## For me 
+
+# Model Forecasts 
+
+# Reproducibility
