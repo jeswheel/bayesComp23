@@ -70,21 +70,20 @@ knitr::opts_chunk$set(
 )
 ```
 
-## Advantages of Statistical Modeling
+## Introduction
 
--   Nonlinear-dynamic statistical models have proven to be a useful tool for modeling infectious disease outbreaks (TODO: CITE)
+-   Nonlinear-dynamic statistical models have proven to be a useful tool for modeling infectious disease outbreaks.
 -   Most common examples are SIR models and their various extensions.
--   This class of models enable the modeling of scientifically meaningful latent variables, prediction of the future state of the outbreak, and modeling the potential effects of interventions (such as vaccinations) @lee20
--   Despite their utility, there exist many cautionary warnings against the use of these types of models [@behrend20; @saltelli20; @ioannidis20; @ganusov16].
+-   Despite their utility, there exist many cautionary warnings against the use of these types of models (weakly identifiable, models may not be realistic, can have poor predictions, etc.) [@behrend20; @saltelli20; @ioannidis20; @ganusov16].
 -   Current standards for model based inference do not adequately address these valid concerns.
 
 ## Topics
 
-We try to address common shortcomings in non-linear dynamic modeling for policy inference. Topics we consider include:
+We try to address common shortcomings in non-linear dynamic modeling for policy inference, and offer practical advise on the use of mechanistic models for policy advice. Topics we consider include:
 
--   The use of *benchmarks*
--   Fitting meta-population models
--   Reproducibility and *Extendability*
+-   Fitting meta-population models.
+-   Model evaluation via *benchmarks*.
+-   Reproducibility and *Extendability*.
 
 We begin by providing a brief description of the class of models being considered and the methods used to calibrate the models to observed incidence counts.
 
@@ -92,7 +91,7 @@ We begin by providing a brief description of the class of models being considere
 
 -   The models we focus on are partially observed Markov process (POMP) models.
 
-![Credit: @king22](images/pomp.png){width="70%"}
+![Aaron King and Edward Ionides @king22](images/pomp.png){width="70%"}
 
 ## POMP Models
 
@@ -101,15 +100,20 @@ We begin by providing a brief description of the class of models being considere
 3.  Measurement Model: $f_{Y_{n}|X_n}(y_n|x_n; \theta)$.
 4.  Initial density: $f_{X_0}(x_0;\theta)$
 
-We limit ourselves to the case when we can only simulate from (2), and call this the *plug-and-play* property.
+We limit ourselves to the case when we can only simulate from (2), called the *simulation based* or *plug-and-play* property.
 
 This framework allows us to consider arbitrary dynamic models; our limitations are our scientific creativity and the information available in the data.
 
 ## Cholera in Haiti
 
--   We consider the 2010-2019 cholera outbreak in Haiti.
+As a case study, we consider the 2010-2019 cholera outbreak in Haiti.
+
 -   Cholera was introduced to Haiti in 2010 following the devastating earthquake of the same year.
 -   Although some new cases have been detected, there were no recorded cholera cases in Haiti between February, 2019 and September 2022 @trevisin22.
+
+We did a literature review on PubMed for key words: "Haiti", "cholera", and "model", resulting in 66 papers.
+
+-   These papers include fitting models "by-hand", relying on previous estimates of model parameters, or by using Bayesian or Frequentist methods.
 
 ## Data
 
@@ -190,14 +194,29 @@ gc()
 
 -   We build on the study by Lee et. al (2020), in which expert teams independently built non-linear models to describe cholera dynamics.
 
-|                | Model 1        | Model 2             | Model 3         |
-|----------------|----------------|---------------------|-----------------|
-| Type           | Stochastic     | Deterministic       | Stochastic      |
-| Spatial Model  | No             | Yes                 | Yes             |
-| Structure      | SEIAR          | SEIARW              | SIARW           |
-| Fitting Method | IF2 @ionides15 | Trajectory Matching | IBPF @ionides22 |
+|                | Model 1        | Model 2             | Model 3               |
+|-----------------|-----------------|---------------------|-----------------|
+| Type           | Stochastic     | Deterministic       | Stochastic            |
+| Spatial Model  | No             | Yes                 | Yes                   |
+| Structure      | SEIAR          | SEIARW              | SIARW                 |
+| Fitting Method | IF2 @ionides15 | Trajectory Matching | IF2 / IBPF @ionides22 |
 
 -   The inability of the original models to predict the long absence of cases (2019-2022) has led to some discussion [@francois20; @rebaudetComment20; @henrys20; @leeReply20].
+
+# Model Fitting
+
+## Models 1 and 2
+
+-   Model 2 is deterministic and consequently the easiest to fit. We mimic the original efforts of Lee et al. and fit the model using trajectory matching using the `spatPomp` package in `R`.
+-   Model 1 is stochastic, spatially aggregated. We used the iterated filtering method to estimate model parameters @ionides15.
+-   Iterated filtering (IF2) was originally used to fit Model 3 @lee20, which is both stochastic and has a meta-population structure.
+
+## Model 3
+
+-   IF2 is based on particle filters @arulampalam02 and scales poorly to meta-population models.
+-   Rebeschini and Van Handel @rebeschini15 proposed the block particle filter (BPF) and provided some theoretical support for many scenarios.
+-   Recently developed iterated block particle filters (IBPF) @ionides22 build on the BPF algorithm and it has similar theoretical properties @ning21ibpf.
+-   We use the IBPF to fit Model 3 to the spatially explicit department data, resulting in better qualitative and quantitative model fits.
 
 ## Common workflow
 
@@ -351,6 +370,16 @@ An ARMA(1, 0) model has AIC value `r round(arima2::arima(df$var, order = c(1, 0,
 plot(x, xlab = "", ylab = '')
 ```
 
+## Model Evaluation
+
+-   Model assessment turns out to be a challenging problem in its own right.
+
+-   Stochastic simulations from the generating model may not necessarily look like the training data.
+
+-   Cross-validation isn't really an option.
+
+-   People are thinking about this: Bayesian approach by Aristotelous, Kypraios and O'Neill @aristotelous22.
+
 ## Benchmarking
 
 -   Comparisons across models only informs us about the relative goodness-of-fit of each model.
@@ -396,22 +425,6 @@ Log-ARMA(2,1) \hspace{-2.5mm}
 \end{tabular}
 \end{center}
 ```
-# Model Fitting
-
-## Models 1 and 2
-
--   Model 2 is deterministic and consequently the easiest to fit. We did simple trajectory matching using the `spatPomp` package in `R`.
--   Model 1 is stochastic, spatially aggregated. We used the iterated filtering method to estimate model parameters @ionides15.
--   Iterated filtering is a likelihood based approach to estimating model parameters for a plug-and-play POMP model.
--   Iterated filtering was originally used to fit Model 3 @lee20, which is both stochastic and has a meta-population structure.
-
-## Model 3
-
--   IF is based on particle filters (PF) @arulampalam02 and scales poorly to meta-population models.
--   Rebeschini and Van Handel @rebeschini15 proposed the block particle filter (BPF) and provided some theoretical support for many scenarios.
--   Recently developed iterated block particle filters (IBPF) @ionides22 build on the BPF algorithm and it has similar theoretical properties @ning21ibpf.
--   We use the IBPF to fit Model 3 to the spatially explicit department data.
-
 <!-- ## Meta-Population Models  -->
 
 <!-- Using a spatially explicit model rather than aggregating over spatial units is a double edged: -->
@@ -490,11 +503,9 @@ Log-ARMA(2,1) \hspace{-2.5mm}
 
 ## Reproducibility and Extendability
 
--   Reproducibility implies that the same results can be obtained at a later date.
 -   In statistics, this often means setting a random seed and providing your data and code along with your submission.
 -   Large projects, however, may make code hard to read or difficult for someone else to run.
 -   A higher standard of reproducibility is that someone who was not directly involved in your initial project should be able to run and understand your code with limited effort.
--   This higher standard is particularly difficult given potential updates to software over time.
 -   *Extendability* is the idea that it should not be excessively burdensome for someone else to try a small modification to your analysis (such as a model modification or a change to a figure).
 -   Scientific results are only trustworthy to the extent that they can be critically questioned, and an extendable analysis should facilitate such examination @gentleman07.
 
@@ -505,5 +516,25 @@ Log-ARMA(2,1) \hspace{-2.5mm}
 -   Virtual environments can be used so that the same version of `R` / `Python` and each of the packages used during the analysis can be loaded and used at a later date.
 
 -   `R` packages and `Python` libraries can also be built in the context of a data analysis project. This can be useful even if the only purpose of the package is for the problem at hand, since the package can contain data, code, and documentation.
+
+## Additional Topics
+
+-   Parameter estimates and hidden states should make sense in the context of the model and alternative measurements.
+
+-   Conditional log-likelihoods are useful for determining weaknesses in the model.
+
+-   Accounting for parameter uncertainty in model forecasts.
+
+-   Accounting for most recent information in our forecasts.
+
+-   Models are weakly identifiable.
+
+## Acknowledgements
+
+-   Lee et al.
+
+-   Undergrads: Kevin Tan and Noah Truetle
+
+-   Other grad students: AnnaElaine Rosengart, Zhuoxun Jiang
 
 ## References {.allowframebreaks}
